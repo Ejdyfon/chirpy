@@ -1,6 +1,21 @@
 package main
 
-import "net/http"
+import (
+	"fmt"
+	"net/http"
+	"sync/atomic"
+)
+
+type apiConfig struct {
+	fileserverHits atomic.Int32
+}
+
+func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		cfg.fileserverHits.Add(1)
+		next.ServeHTTP(w, r)
+	})
+}
 
 func customHandler(rw http.ResponseWriter, req *http.Request) {
 	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
@@ -9,10 +24,30 @@ func customHandler(rw http.ResponseWriter, req *http.Request) {
 
 }
 
+func (cfg *apiConfig) hitsHandler(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	rw.WriteHeader(200)
+	str := fmt.Sprintf("Hits: %v", cfg.fileserverHits.Load())
+	rw.Write([]byte(str))
+
+}
+
+func (cfg *apiConfig) resetHitsHandler(rw http.ResponseWriter, req *http.Request) {
+	cfg.fileserverHits.Swap(0)
+	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	rw.WriteHeader(200)
+	str := fmt.Sprintf("Hits: %v", cfg.fileserverHits.Load())
+	rw.Write([]byte(str))
+
+}
+
 func main() {
+	apiCfg := apiConfig{}
 	srv := http.NewServeMux()
 	srv.HandleFunc("/healthz", customHandler)
-	srv.Handle("/app/", http.StripPrefix("/app", http.FileServer(http.Dir("."))))
+	srv.HandleFunc("/metrics", apiCfg.hitsHandler)
+	srv.HandleFunc("/reset", apiCfg.resetHitsHandler)
+	srv.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	httpsrv := http.Server{}
 	httpsrv.Handler = srv
 	httpsrv.Addr = ":8080"

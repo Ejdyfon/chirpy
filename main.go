@@ -25,9 +25,9 @@ func customHandler(rw http.ResponseWriter, req *http.Request) {
 }
 
 func (cfg *apiConfig) hitsHandler(rw http.ResponseWriter, req *http.Request) {
-	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+	rw.Header().Add("Content-Type", "text/html; charset=utf-8")
 	rw.WriteHeader(200)
-	str := fmt.Sprintf("Hits: %v", cfg.fileserverHits.Load())
+	str := fmt.Sprintf("<html><body><h1>Welcome, Chirpy Admin</h1><p>Chirpy has been visited %d times!</p></body></html>", cfg.fileserverHits.Load())
 	rw.Write([]byte(str))
 
 }
@@ -44,9 +44,9 @@ func (cfg *apiConfig) resetHitsHandler(rw http.ResponseWriter, req *http.Request
 func main() {
 	apiCfg := apiConfig{}
 	srv := http.NewServeMux()
-	srv.HandleFunc("/healthz", customHandler)
-	srv.HandleFunc("/metrics", apiCfg.hitsHandler)
-	srv.HandleFunc("/reset", apiCfg.resetHitsHandler)
+	srv.HandleFunc("GET /api/healthz", customHandler)
+	srv.HandleFunc("GET /admin/metrics", apiCfg.hitsHandler)
+	srv.HandleFunc("POST /admin/reset", apiCfg.resetHitsHandler)
 	srv.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	httpsrv := http.Server{}
 	httpsrv.Handler = srv

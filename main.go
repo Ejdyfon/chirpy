@@ -1,13 +1,27 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"sync/atomic"
 )
 
 type apiConfig struct {
 	fileserverHits atomic.Int32
+}
+
+type validateChirpRequest struct {
+	Body string `json:"body"`
+}
+
+type validateChirpResponseError struct {
+	Error string `json:"error"`
+}
+
+type validateChirpResponse struct {
+	Valid bool `json:"valid"`
 }
 
 func (cfg *apiConfig) middlewareMetricsInc(next http.Handler) http.Handler {
@@ -41,12 +55,43 @@ func (cfg *apiConfig) resetHitsHandler(rw http.ResponseWriter, req *http.Request
 
 }
 
+func validateChirp(rw http.ResponseWriter, req *http.Request) {
+	rw.Header().Add("Content-Type", "text/json; charset=utf-8")
+	decoder := json.NewDecoder(req.Body)
+	request := validateChirpRequest{}
+	err := decoder.Decode(&request)
+	if err != nil {
+		log.Printf("Error decoding request: %s", err)
+		rw.WriteHeader(500)
+		respBody := validateChirpResponseError{Error: "Something went wrong"}
+		dat, _ := json.Marshal(respBody)
+		rw.Write(dat)
+		return
+	}
+
+	if len(request.Body) > 140 {
+		rw.WriteHeader(400)
+		respBody := validateChirpResponseError{Error: "Chirp is too long"}
+		dat, _ := json.Marshal(respBody)
+		rw.Write(dat)
+		return
+	}
+
+	rw.WriteHeader(200)
+	respBody := validateChirpResponse{Valid: true}
+	dat, _ := json.Marshal(respBody)
+	rw.Write(dat)
+	return
+
+}
+
 func main() {
 	apiCfg := apiConfig{}
 	srv := http.NewServeMux()
 	srv.HandleFunc("GET /api/healthz", customHandler)
 	srv.HandleFunc("GET /admin/metrics", apiCfg.hitsHandler)
 	srv.HandleFunc("POST /admin/reset", apiCfg.resetHitsHandler)
+	srv.HandleFunc("POST /api/validate_chirp", validateChirp)
 	srv.Handle("/app/", apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(".")))))
 	httpsrv := http.Server{}
 	httpsrv.Handler = srv

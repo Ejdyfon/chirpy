@@ -59,3 +59,39 @@ func getCleanedBody(body string, badWords map[string]struct{}) string {
 	cleaned := strings.Join(words, " ")
 	return cleaned
 }
+
+func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
+
+	chirps, err := cfg.db.GetAllChirps(r.Context())
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
+		return
+	}
+	res := []Chirp{}
+	for _, v := range chirps {
+		res = append(res, Chirp(v))
+	}
+
+	respondWithJSON(w, http.StatusOK, res)
+}
+
+func (cfg *apiConfig) handlerGetChirp(w http.ResponseWriter, r *http.Request) {
+	pathParam := r.PathValue("chirpID")
+	parmId, err := uuid.Parse(pathParam)
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Couldn't convert param", err)
+		return
+	}
+	chirp, err := cfg.db.GetChirpById(r.Context(), parmId)
+
+	if chirp.ID == uuid.Nil {
+		respondWithError(w, http.StatusNotFound, "Couldn't find chirp", err)
+		return
+	}
+	if err != nil {
+		respondWithError(w, http.StatusInternalServerError, "Error while fetching", err)
+		return
+	}
+
+	respondWithJSON(w, http.StatusOK, Chirp(chirp))
+}

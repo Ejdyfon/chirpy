@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/ejdyfon/chirpy/internal/auth"
 	"github.com/ejdyfon/chirpy/internal/database"
 	"github.com/google/uuid"
 )
@@ -12,13 +13,23 @@ import (
 func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request) {
 
 	type parameters struct {
-		Body   string    `json:"body"`
-		UserId uuid.UUID `json:"user_id"`
+		Body string `json:"body"`
+	}
+
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't find JWT", err)
+		return
+	}
+	userID, err := auth.ValidateJWT(token, cfg.jwtSecret)
+	if err != nil {
+		respondWithError(w, http.StatusUnauthorized, "Couldn't validate JWT", err)
+		return
 	}
 
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
+	err = decoder.Decode(&params)
 	if err != nil {
 		respondWithError(w, http.StatusInternalServerError, "Couldn't decode parameters", err)
 		return
@@ -37,7 +48,7 @@ func (cfg *apiConfig) handlerCreateChirp(w http.ResponseWriter, r *http.Request)
 	}
 	cleaned := getCleanedBody(params.Body, badWords)
 
-	prm := database.CreatChirpParams{Body: cleaned, UserID: params.UserId}
+	prm := database.CreatChirpParams{Body: cleaned, UserID: userID}
 
 	user, err := cfg.db.CreatChirp(r.Context(), prm)
 	if err != nil {

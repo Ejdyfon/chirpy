@@ -18,6 +18,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db             *database.Queries
 	platform       string
+	jwtSecret      string
 }
 
 type Chirp struct {
@@ -34,11 +35,16 @@ func main() {
 	const port = "8080"
 	dbURL := os.Getenv("DB_URL")
 	db, _ := sql.Open("postgres", dbURL)
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if jwtSecret == "" {
+		log.Fatal("JWT_SECRET environment variable is not set")
+	}
 
 	apiCfg := apiConfig{
 		fileserverHits: atomic.Int32{},
 		db:             database.New(db),
 		platform:       os.Getenv("PLATFORM"),
+		jwtSecret:      jwtSecret,
 	}
 
 	mux := http.NewServeMux()

@@ -19,6 +19,7 @@ type apiConfig struct {
 	db             *database.Queries
 	platform       string
 	jwtSecret      string
+	apiKey         string
 }
 
 type Chirp struct {
@@ -45,11 +46,14 @@ func main() {
 		db:             database.New(db),
 		platform:       os.Getenv("PLATFORM"),
 		jwtSecret:      jwtSecret,
+		apiKey:         os.Getenv("POLKA_KEY"),
 	}
 
 	mux := http.NewServeMux()
 	fsHandler := apiCfg.middlewareMetricsInc(http.StripPrefix("/app", http.FileServer(http.Dir(filepathRoot))))
 	mux.Handle("/app/", fsHandler)
+
+	mux.HandleFunc("POST /api/polka/webhooks", apiCfg.handlerWebhook)
 
 	mux.HandleFunc("GET /api/healthz", handlerReadiness)
 	mux.HandleFunc("GET /api/chirps", apiCfg.handlerGetAllChirps)

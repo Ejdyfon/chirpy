@@ -73,11 +73,24 @@ func getCleanedBody(body string, badWords map[string]struct{}) string {
 
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
 
-	chirps, err := cfg.db.GetAllChirps(r.Context())
-	if err != nil {
-		respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
-		return
+	s := r.URL.Query().Get("author_id")
+	var chirps []database.Chirp
+	if s != "" {
+		authorId, err := uuid.Parse(s)
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Cannot parse param", err)
+			return
+		}
+		chirps, err = cfg.db.GetAllChirpsByAuthor(r.Context(), authorId)
+	} else {
+		var err error
+		chirps, err = cfg.db.GetAllChirps(r.Context())
+		if err != nil {
+			respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
+			return
+		}
 	}
+
 	res := []Chirp{}
 	for _, v := range chirps {
 		res = append(res, Chirp(v))

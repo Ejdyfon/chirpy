@@ -15,6 +15,9 @@ delete from chirps;
 -- name: GetAllChirps :many
 select * from chirps order by created_at;
 
+-- name: GetAllChirpsByAuthor :many
+select * from chirps where user_id = $1 order by created_at;
+
 -- name: GetChirpById :one
 select * from chirps where id = $1;
 

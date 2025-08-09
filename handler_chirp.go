@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
+	"sort"
 	"strings"
 
 	"github.com/ejdyfon/chirpy/internal/auth"
@@ -74,6 +75,7 @@ func getCleanedBody(body string, badWords map[string]struct{}) string {
 func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request) {
 
 	s := r.URL.Query().Get("author_id")
+	sortOrder := r.URL.Query().Get("sort")
 	var chirps []database.Chirp
 	if s != "" {
 		authorId, err := uuid.Parse(s)
@@ -89,6 +91,16 @@ func (cfg *apiConfig) handlerGetAllChirps(w http.ResponseWriter, r *http.Request
 			respondWithError(w, http.StatusInternalServerError, "Couldn't create chirp", err)
 			return
 		}
+	}
+
+	if sortOrder != "" {
+		if sortOrder == "asc" {
+			sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.Before(chirps[j].CreatedAt) })
+		} else if sortOrder == "desc" {
+			sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.After(chirps[j].CreatedAt) })
+		}
+	} else {
+		sort.Slice(chirps, func(i, j int) bool { return chirps[i].CreatedAt.Before(chirps[j].CreatedAt) })
 	}
 
 	res := []Chirp{}
